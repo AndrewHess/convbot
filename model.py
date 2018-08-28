@@ -1,5 +1,6 @@
 from keras.models import Model
 from keras.layers import Input, Dense, Concatenate
+from keras.optimizers import adam
 from utils.losses import generator_loss, discriminator_loss
 
 
@@ -30,10 +31,11 @@ def setup_model():
         print(layer.name, layer.trainable)
     print('--------------------------------')
 
+    optimizer = adam(lr=0.01)
 
     # Compile the models for training.
-    dis.compile(optimizer='adam', loss=discriminator_loss)
-    full.compile(optimizer='adam', loss=generator_loss)
+    dis.compile(optimizer=optimizer, loss=discriminator_loss)
+    full.compile(optimizer=optimizer, loss=generator_loss)
 
     return gen, dis, full
 
@@ -47,7 +49,7 @@ def build_model():
     gen_input = Input(shape=(input_size,), name='gen_input')
     meaning = meaning_model(gen_input)
     concat = Concatenate(name='gen_concat')([memory, meaning])
-    gen_output = Dense(input_size, name='gen_output')(concat)
+    gen_output = Dense(input_size, activation='relu', name='gen_output')(concat)
 
     # Build the discriminator.
     dis_input = Input(shape=(input_size,), name='dis_input')
@@ -56,8 +58,8 @@ def build_model():
     dis_output = Dense(1, activation='sigmoid', name='dis_output')(concat)
 
     # Setup the models.
-    gen  = Model(inputs=[gen_input, mem_input], outputs=gen_output, name='generator')
-    dis  = Model(inputs=[dis_input, mem_input], outputs=dis_output, name='discriminator')
+    gen = Model(inputs=[gen_input, mem_input], outputs=gen_output, name='generator')
+    dis = Model(inputs=[dis_input, mem_input], outputs=dis_output, name='discriminator')
 
     full_output = dis([gen_output, mem_input])
     full = Model(inputs=[gen_input, mem_input], outputs=full_output, name='full_model')
@@ -69,6 +71,5 @@ def build_meaning():
     ''' Build a network that determines the meaning of a sentence. '''
     input_layer = Input(shape=(input_size,), name='meaning_input')
     output_layer = Dense(2, activation='relu')(input_layer)
-
 
     return Model(inputs=input_layer, outputs=output_layer, name='meaning')
