@@ -21,6 +21,16 @@ def make_vocab():
     return vocab, rev_vocab
 
 
+def text_in_vocab(text, vocab):
+    ''' Check if each word in the text string is in the vocab. '''
+
+    for word in text.split(' '):
+        if word not in vocab:
+            return False
+
+    return True
+
+
 def encode_with_dict(inputs, vocab):
     ''' Encode the input by replacing each value with its value from vocab. '''
 

@@ -8,11 +8,16 @@ def get_args():
 
     # Add the arguments.
     parser.add_argument('--train', help='the parts of the model to train',
-                        choices=['generator', 'discriminator', 'all', 'none'],
-                        default='none')
+                        choices=['gen', 'dis', 'all', 'none'], default='none')
     parser.add_argument('--load', type=str, help='the file to load the model from')
     parser.add_argument('--save', type=str, help='the file to save the model to')
-    parser.add_argument('--model_folder', type=str, default='saved',
+    parser.add_argument('--model_folder', type=str, default='./saved',
                         help='the directory that stores files for saving the model')
+    parser.add_argument('--share', choices=['gen', 'dis'], default='dis',
+                        help='the model that initially shares its weights with the other model')
+    parser.add_argument('--data_folder', type=str, default='./data',
+                        help='the folder to store training data files in')
+    parser.add_argument('--data_file', type=str, default=None,
+                        help='the file to add data to for the model to learn from')
 
     return parser.parse_args()
