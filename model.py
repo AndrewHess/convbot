@@ -14,59 +14,35 @@ input_size = 100
 vocab_len = 5
 
 
-def word_probs_to_words(x):
-    ''' Determine the predicted words from the probabilites of each word.
-
-    x: A tensor of shape (batch_size, num_words * len(vocab)) that contains the
-       probability of each word at each of the num_words locations.
-
-    Returns: A tensor of shape (batch_size, num_words, 1) by selecting the
-             most probable word for each location.
-    '''
-
-    # Reshape x to (batch_size, num_words, len(vocab)). The Reshape layer does
-    # not include the batch_size in the target shape.
-    x = Reshape((input_size, vocab_len))(x)
-
-    # Get the one hot mask of where the max probabilites are.
-    indices = K.argmax(x, axis=-1)
-    indices = K.cast(indices, dtype=tf.float32)
-
-    return indices
-
-
 def setup_model():
+    ''' Build and compile the models. '''
+
     # Build the models.
     gen, dis, full = build_model()
 
-    # print('discriminator model')
-    # dis.summary()
-
     # The full model is to train the generator, so freeze the discriminator.
     full.get_layer('discriminator').trainable = False
+
     # Make it so that only the discriminator can learn sentence meaning.
     full.get_layer('gen_meaning').trainable = False
-    # full.get_layer('memory').trainable = False
 
     # print('full model')
     # full.summary()
-
-    # optimizer = adam(lr=0.1)
-    optimizer = adam()
+    # print('discriminator model')
+    # dis.summary()
 
     # Compile the models for training.
-    dis.compile(optimizer=optimizer, loss=discriminator_loss)
-    full.compile(optimizer=optimizer, loss=generator_loss)
+    dis.compile(optimizer='adam', loss=discriminator_loss)
+    full.compile(optimizer='adam', loss=generator_loss)
 
     return gen, dis, full
 
 
 def build_model():
-    # meaning_model = build_meaning()
+    ''' Build the generator, discriminator, and combined models. '''
 
+    # Setup the memory.
     mem_input = Input(shape=(1,), name='mem_input')
-    # dis_mem_input = Input(shape=(1,), name='dis_mem_input')
-    # memory = Dense(2, name='memory')(mem_input)
     gen_memory = Dense(2, name='gen_memory')(mem_input)
     dis_memory = Dense(2, name='dis_memory')(mem_input)
 
@@ -99,6 +75,7 @@ def build_model():
 
 def build_meaning(is_gen):
     ''' Build a network that determines the meaning of a sentence. '''
+
     model_name = 'gen_meaning' if is_gen else 'dis_meaning'
 
     input_layer = Input(shape=(input_size, vocab_len), name='meaning_input')
@@ -106,11 +83,3 @@ def build_meaning(is_gen):
     output_layer = Dense(10, activation='relu')(hidden)
 
     return Model(inputs=input_layer, outputs=output_layer, name=model_name)
-
-
-# def build_memory():
-#     ''' Build a network to keep a memory. '''
-#     input_layer = Input(shape=(1,), name='mem_input')
-#     output_layer = Dense(2, name='memory_dense')(mem_input)
-#
-#     return Model(inputs=input_layer, outputs=output_layer)
