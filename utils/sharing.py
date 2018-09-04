@@ -4,7 +4,7 @@ from keras.models import load_model
 from utils.losses import generator_loss, discriminator_loss
 
 
-def load(gen, dis, full, args):
+def load(args):
     ''' Load the GAN models. '''
     assert(args.load is not None)
 
@@ -13,6 +13,8 @@ def load(gen, dis, full, args):
     full = load_model(os.path.join(args.model_folder, 'full_' + args.load),
                       custom_objects=custom_objects)
     dis  = load_model(os.path.join(args.model_folder, 'dis_' + args.load),
+                      custom_objects=custom_objects)
+    gen  = load_model(os.path.join(args.model_folder, 'gen_' + args.load),
                       custom_objects=custom_objects)
 
     return gen, dis, full

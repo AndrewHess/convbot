@@ -1,7 +1,6 @@
 import os
 import numpy as np
 
-from model import setup_model
 from run import add_data, talk
 from utils import losses
 from utils.args import get_args
@@ -13,9 +12,6 @@ def main():
     args = get_args()
     print('args:', args)
 
-    # Get the model.
-    gen, dis, full = setup_model()
-
     # Build the vocabulary.
     vocab, rev_vocab = make_vocab()
 
@@ -24,7 +20,7 @@ def main():
         add_data(os.path.join(args.data_folder, args.data_file), vocab)
     else:
         # Run the bot.
-        talk(args, gen, dis, full, vocab)
+        talk(args, vocab, rev_vocab)
 
     return
 

@@ -39,14 +39,17 @@ def setup_model():
     # Build the models.
     gen, dis, full = build_model()
 
-    print('discriminator model')
-    dis.summary()
+    # print('discriminator model')
+    # dis.summary()
 
     # The full model is to train the generator, so freeze the discriminator.
-    # full.get_layer('discriminator').trainable = False
+    full.get_layer('discriminator').trainable = False
+    # Make it so that only the discriminator can learn sentence meaning.
+    full.get_layer('gen_meaning').trainable = False
+    # full.get_layer('memory').trainable = False
 
-    print('full model')
-    full.summary()
+    # print('full model')
+    # full.summary()
 
     # optimizer = adam(lr=0.1)
     optimizer = adam()
@@ -59,26 +62,30 @@ def setup_model():
 
 
 def build_model():
-    meaning_model = build_meaning()
+    # meaning_model = build_meaning()
+
     mem_input = Input(shape=(1,), name='mem_input')
-    memory = Dense(2, name='memory')(mem_input)
+    # dis_mem_input = Input(shape=(1,), name='dis_mem_input')
+    # memory = Dense(2, name='memory')(mem_input)
+    gen_memory = Dense(2, name='gen_memory')(mem_input)
+    dis_memory = Dense(2, name='dis_memory')(mem_input)
 
     # Build the generator.
     gen_input = Input(shape=(input_size, vocab_len), name='gen_input')
-    meaning = meaning_model(gen_input)
-    concat = Concatenate(name='gen_mem_concat')([memory, meaning])
+    meaning = build_meaning(True)(gen_input)
+    gen_mem_concat = Concatenate(name='gen_mem_concat')([gen_memory, meaning])
 
     # Create probabilites for each word for each output location.
-    hidden = [Dense(vocab_len, activation='softmax', name='gen_word_' + str(i))(concat)
+    hidden = [Dense(vocab_len, activation='softmax', name='gen_word_' + str(i))(gen_mem_concat)
               for i in range(input_size)]
-    concat = Concatenate(name='gen_word_concat')(hidden)
-    gen_output = Reshape((input_size, vocab_len), name='gen_output')(concat)
+    gen_word_concat = Concatenate(name='gen_word_concat')(hidden)
+    gen_output = Reshape((input_size, vocab_len), name='gen_output')(gen_word_concat)
 
     # Build the discriminator.
     dis_input = Input(shape=(input_size, vocab_len), name='dis_input')
-    meaning = meaning_model(dis_input)
-    concat = Concatenate(name='dis_concat')([memory, meaning])
-    dis_output = Dense(1, activation='sigmoid', name='dis_output')(concat)
+    meaning = build_meaning(False)(dis_input)
+    dis_concat = Concatenate(name='dis_concat')([dis_memory, meaning])
+    dis_output = Dense(1, activation='sigmoid', name='dis_output')(dis_concat)
 
     # Setup the models.
     gen = Model(inputs=[gen_input, mem_input], outputs=gen_output, name='generator')
@@ -90,10 +97,20 @@ def build_model():
     return gen, dis, full
 
 
-def build_meaning():
+def build_meaning(is_gen):
     ''' Build a network that determines the meaning of a sentence. '''
+    model_name = 'gen_meaning' if is_gen else 'dis_meaning'
+
     input_layer = Input(shape=(input_size, vocab_len), name='meaning_input')
     hidden = Flatten(name='meaning_flatten')(input_layer)
     output_layer = Dense(10, activation='relu')(hidden)
 
-    return Model(inputs=input_layer, outputs=output_layer, name='meaning')
+    return Model(inputs=input_layer, outputs=output_layer, name=model_name)
+
+
+# def build_memory():
+#     ''' Build a network to keep a memory. '''
+#     input_layer = Input(shape=(1,), name='mem_input')
+#     output_layer = Dense(2, name='memory_dense')(mem_input)
+#
+#     return Model(inputs=input_layer, outputs=output_layer)

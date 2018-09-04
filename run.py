@@ -2,6 +2,7 @@ import os
 import numpy as np
 from keras.models import load_model
 
+from model import setup_model
 from utils.preprocessing import encode_with_dict, text_in_vocab
 from utils.losses import generator_loss, discriminator_loss
 from utils.sharing import load, save, share_weights
@@ -38,13 +39,13 @@ def get_formatted_user_input(vocab):
     return format_input(encoded, vocab)
 
 
-def talk(args, gen, dis, full, vocab):
+def talk(args, vocab, rev_vocab):
     ''' Infinitely run the loop of user and bot talking with user feedback. '''
 
     # Load the model.
     if args.load:
-        gen, dis, full = load(gen, dis, full, args)
-
+        gen, dis, full = load(args)
+        
         # Share the weights.
         if args.share == 'gen':
             # Share the meaning and memory layers.
@@ -56,10 +57,16 @@ def talk(args, gen, dis, full, vocab):
         else:
             # Share the meaning and memory layers with the untrainable
             # discriminator in the full model.
+            # print('old full dis mem:', full.get_layer('discriminator').get_layer('memory').get_weights())
             share_weights(dis, full.get_layer('discriminator'))
+            # print('new full dis mem:', full.get_layer('discriminator').get_layer('memory').get_weights())
+            # print('dis mem:', dis.get_layer('memory').get_weights())
 
             # Share the meaning and memory layers with the generator.
             share_weights(dis, full)
+    else:
+        # Get the model.
+        gen, dis, full = setup_model()
 
     # Run the main loop.
     while True:
@@ -70,14 +77,17 @@ def talk(args, gen, dis, full, vocab):
         except ValueError:
             continue
 
-        response = gen.predict(gen_input)[0]
+        response = gen.predict(gen_input)
+        bad_gen_out = [np.array(response), np.array([[1]])]
+        # print('response:', response)
+        # print('bad_gen_out:', bad_gen_out)
 
         # Get the most likely word for each position.
-        response = np.argmax(response, axis=1)
+        response = np.argmax(response[0], axis=1)
 
         # Print the response.
-        decoded = encode_with_dict(response, rev_vocab)
-        print(prompt, ' '.join(decoded))
+        # decoded = encode_with_dict(response, rev_vocab)
+        print(prompt, ' '.join(encode_with_dict(response, rev_vocab)))
 
         # Train the model using the user to generate good labels.
         if args.train != 'none':
@@ -88,40 +98,60 @@ def talk(args, gen, dis, full, vocab):
             except ValueError:
                 continue
 
+            # print('good_gen_out:', good_gen_out)
+
             # Setup the input for training the discriminator.
-            bad_gen_out = format_input(list(response), vocab)
-            dis_input = [np.concatenate((bad_gen_out[0], good_gen_out[0])),
-                         np.concatenate((bad_gen_out[1], good_gen_out[1]))]
+            # dis_input = [np.concatenate((bad_gen_out[0], good_gen_out[0])),
+            #              np.concatenate((bad_gen_out[1], good_gen_out[1]))]
+
+            # save(dis, args)
 
             # Train the model.
             if args.train in ['all', 'gen']:
                 print('traing the generator ...')
+                # print('old full mem:', full.get_layer('memory').get_weights())
+                # print('old full dis mem:', full.get_layer('discriminator').get_layer('memory').get_weights())
                 full.fit(gen_input, np.array([0]))
 
                 # Share the new weights with the discriminator.
                 share_weights(full, dis)
+                share_weights(full, full.get_layer('discriminator'))
+
+                # Share the new weights with the generator.
+                share_weights(full, gen)
+
+                # print('new full mem:', full.get_layer('memory').get_weights())
+                # print('new full dis mem:', full.get_layer('discriminator').get_layer('memory').get_weights())
+
+            # dis  = load_model(os.path.join(args.model_folder, 'temp.h5'),
+            #                   custom_objects={'discriminator_loss': discriminator_loss})
 
             # Train the discriminator.
             if args.train in ['all', 'dis']:
                 print('training the discriminator ...')
+                # print('old dis mem:', dis.get_layer('memory').get_weights())
                 # dis.fit(dis_input, np.array([0, 1]))
                 dis.fit(good_gen_out, np.array([1]))
                 dis.fit(bad_gen_out,  np.array([0]))
+                # print('new dis mem:', dis.get_layer('memory').get_weights())
 
                 # Share the new weights with the full model.
                 share_weights(dis, full.get_layer('discriminator'))
+                share_weights(dis, full)
+
+                # Share the weights with the generator.
+                share_weights(dis, gen)
 
             # Save the model.
             if args.save:
-                print('save the model [y/n]: ', end='')
-                if input() != 'y':
+                print('enter s to save: ', end='')
+                if input() != 's':
                     continue
 
                 print('saving the model ...')
                 save(full, args, prefix='full_')
                 save(dis, args, prefix='dis_')
-                # full.save(os.path.join(args.model_folder, 'full_' + args.save))
-                # dis.save(os.path.join(args.model_folder, 'dis_' + args.save))
+                save(gen, args, prefix='gen_')
                 print('model saved')
 
 
