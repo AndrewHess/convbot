@@ -10,6 +10,7 @@ from utils.sharing import load, save, share_weights
 prompt = '> '
 num_words = 100
 vocab_len = 5
+itr = 0
 
 
 def format_input(encoded):
@@ -72,7 +73,11 @@ def possibly_train_dis(gen, dis, full, data_x, data_y, args):
 def possibly_save(gen, dis, full, args):
     ''' Save the models if the user wants to. '''
 
-    if args.save:
+    global itr
+    itr += 1
+    print('iteration:', itr)
+
+    if args.save and itr % args.save_itr == 0:
         print('enter s to save: ', end='')
         if input() != 's':
             return
@@ -89,23 +94,8 @@ def possibly_save(gen, dis, full, args):
 def talk(args, vocab, rev_vocab):
     ''' Infinitely run the loop of user and bot talking with user feedback. '''
 
-    # Load the model.
-    if args.load:
-        gen, dis, full = load(args)
-
-        # Share the weights.
-        if args.share == 'gen':
-            # Share the meaning and memory layers with the discriminator.
-            share_weights(full, dis)
-            share_weights(full, full.get_layer('discriminator'))
-        else:
-            # Share the meaning and memory layers with the untrainable
-            # discriminator in the full model and the generator.
-            share_weights(dis, full.get_layer('discriminator'))
-            share_weights(dis, full)
-    else:
-        # Get the model.
-        gen, dis, full = setup_model()
+    # Setup the models.
+    gen, dis, full = load(args) if args.load else setup_model()
 
     # Run the main loop.
     while True:
