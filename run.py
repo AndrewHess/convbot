@@ -109,79 +109,75 @@ def talk(args, vocab, rev_vocab):
 
     # Run the main loop.
     while True:
-        print(prompt, end='')
+        if args.train_file is not None:
+            # Make sure at least one model is being trained.
+            assert(args.train != 'none')
 
-        try:
-            gen_input = get_formatted_user_input(vocab)
-        except ValueError:
-            continue
+            train_x, train_y = [], []
 
-        response = gen.predict(gen_input)
-        bad_gen_out = [np.array(response), np.array([[1]])]
+            # Read the data from train_file.
+            with open(os.path.join(args.data_folder, args.train_file), 'r') as infile:
+                for line in infile:
+                    line = line[:-1]  # Remove the newline.
+                    pos = line.find(':')
+                    train_x.append(line[:pos])
+                    train_y.append(line[pos + 1:])
 
-        # Get the most likely word for each position.
-        response = np.argmax(response[0], axis=1)
+            # Set each item in train_x and train_y to what is used as input.
+            for (i, (x, y)) in enumerate(zip(train_x, train_y)):
+                # Encode the data into word id numbers.
+                x = encode_with_dict(x.split(' '), vocab)
+                y = encode_with_dict(y.split(' '), vocab)
 
-        # Print the response.
-        print(prompt, ' '.join(encode_with_dict(response, rev_vocab)))
+                # Get the data into the input format for the models.
+                x = format_input(x)
+                y = format_input(y)
 
-        # Train the model.
-        if args.train != 'none':
-            # Check if the training data is from the user or a file.
-            if args.train_file is not None:
-                train_x, train_y = [], []
+                train_x[i] = x
+                train_y[i] = y
 
-                # Read the data from train_file.
-                with open(os.path.join(args.data_folder, args.train_file), 'r') as infile:
-                    for line in infile:
-                        line = line[:-1]  # Remove the newline.
-                        pos = line.find(':')
-                        train_x.append(line[:pos])
-                        train_y.append(line[pos + 1:])
+            # Get the generator predictions.
+            pred = [gen.predict(x) for x in train_x]
 
-                # Set each item in train_x and train_y to what is used as input.
-                for (i, (x, y)) in enumerate(zip(train_x, train_y)):
-                    # Encode the data into word id numbers.
-                    x = encode_with_dict(x.split(' '), vocab)
-                    y = encode_with_dict(y.split(' '), vocab)
+            # Create the input for the discriminator.
+            real_dis_input = np.concatenate([y[0] for y in train_y])
+            prompt_input = np.concatenate([x[0] for x in train_x] * 2)
+            word_input = np.concatenate((np.concatenate(pred), real_dis_input))
+            mem_input = np.array([np.array([1])] * 2 * len(train_x))
+            dis_input = [prompt_input, word_input, mem_input]
 
-                    # Get the data into the input format for the models.
-                    x = format_input(x)
-                    y = format_input(y)
+            # Create the input for the generator.
+            gen_input = np.concatenate([x[0] for x in train_x])
+            gen_input = [gen_input, np.array([[1]] * len(train_x))]
 
-                    train_x[i] = x
-                    train_y[i] = y
-
-                # Get the generator predictions.
-                pred = []
-
-                for x in train_x:
-                    pred.append(gen.predict(x))
-
-                # Create the input for the discriminator.
-                real_dis_input = []
-
-                for y in train_y:
-                    real_dis_input.append(y[0])
-
-                real_dis_input = np.concatenate(real_dis_input)
-
-                word_input = np.concatenate((np.concatenate(pred), real_dis_input))
-                mem_input = np.array([np.array([1])] * 2 * len(train_x))
-                dis_input = [word_input, mem_input]
-
-                gen_labels = np.array([np.array([0])] * len(train_x))
-                dis_labels = np.concatenate((np.array([np.array([0])] * len(train_x)),
+            # Create the labels.
+            gen_labels = np.array([np.array([0])] * len(train_x))
+            dis_labels = np.concatenate((np.array([np.array([0])] * len(train_x)),
                                          np.array([np.array([1])] * len(train_x))))
 
-                gen_input = np.array([x[0] for x in train_x])
-                gen_input = gen_input.reshape(12, 100, 5)
-                gen_input = [gen_input, np.array([[1]] * len(train_x))]
+            # Train and save the models.
+            possibly_train_gen(gen, dis, full, gen_input, gen_labels, args)
+            possibly_train_dis(gen, dis, full, dis_input, dis_labels, args)
+            possibly_save(gen, dis, full, args)
+        else:
+            print(prompt, end='')
 
-                possibly_train_gen(gen, dis, full, gen_input, gen_labels, args)
-                possibly_train_dis(gen, dis, full, dis_input, dis_labels, args)
-                possibly_save(gen, dis, full, args)
-            else:
+            try:
+                gen_input = get_formatted_user_input(vocab)
+            except ValueError:
+                continue
+
+            response = gen.predict(gen_input)
+            bad_gen_out = [np.array(response), np.array([[1]])]
+
+            # Get the most likely word for each position.
+            response = np.argmax(response[0], axis=1)
+
+            # Print the response.
+            print(prompt, ' '.join(encode_with_dict(response, rev_vocab)))
+
+            # Train the model.
+            if args.train != 'none':
                 # Get the label response from the user.
                 print('Enter a good response:', end=' ')
                 try:
@@ -190,7 +186,8 @@ def talk(args, vocab, rev_vocab):
                     continue
 
                 # Setup the input for training the discriminator.
-                dis_input = [np.concatenate((bad_gen_out[0], good_gen_out[0])),
+                dis_input = [np.concatenate((gen_input[0], gen_input[0])),
+                             np.concatenate((bad_gen_out[0], good_gen_out[0])),
                              np.concatenate((bad_gen_out[1], good_gen_out[1]))]
 
                 # Train and save the models.

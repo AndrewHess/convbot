@@ -48,8 +48,8 @@ def build_model():
 
     # Build the generator.
     gen_input = Input(shape=(input_size, vocab_len), name='gen_input')
-    meaning = build_meaning(True)(gen_input)
-    gen_mem_concat = Concatenate(name='gen_mem_concat')([gen_memory, meaning])
+    gen_meaning = build_meaning(True)(gen_input)
+    gen_mem_concat = Concatenate(name='gen_mem_concat')([gen_meaning, gen_memory])
 
     # Create probabilites for each word for each output location.
     hidden = [Dense(vocab_len, activation='softmax', name='gen_word_' + str(i))(gen_mem_concat)
@@ -58,16 +58,18 @@ def build_model():
     gen_output = Reshape((input_size, vocab_len), name='gen_output')(gen_word_concat)
 
     # Build the discriminator.
+    dis_meaning_model = build_meaning(False)
     dis_input = Input(shape=(input_size, vocab_len), name='dis_input')
-    meaning = build_meaning(False)(dis_input)
-    dis_concat = Concatenate(name='dis_concat')([dis_memory, meaning])
+    dis_meaning = dis_meaning_model(dis_input)
+    dis_gen_meaning = dis_meaning_model(gen_input)
+    dis_concat = Concatenate(name='dis_concat')([dis_gen_meaning, dis_meaning, dis_memory])
     dis_output = Dense(1, activation='sigmoid', name='dis_output')(dis_concat)
 
     # Setup the models.
     gen = Model(inputs=[gen_input, mem_input], outputs=gen_output, name='generator')
-    dis = Model(inputs=[dis_input, mem_input], outputs=dis_output, name='discriminator')
+    dis = Model(inputs=[gen_input, dis_input, mem_input], outputs=dis_output, name='discriminator')
 
-    full_output = dis([gen_output, mem_input])
+    full_output = dis([gen_input, gen_output, mem_input])
     full = Model(inputs=[gen_input, mem_input], outputs=full_output, name='full_model')
 
     return gen, dis, full
