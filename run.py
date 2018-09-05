@@ -12,7 +12,7 @@ num_words = 100
 vocab_len = 5
 
 
-def format_input(encoded, vocab):
+def format_input(encoded):
     ''' Generate input for the model based on a list of numbers and the vocab. '''
 
     # The model input has a shape of (batch_size, num_words, vocab_len) and
@@ -36,7 +36,54 @@ def get_formatted_user_input(vocab):
     except ValueError:
         raise
 
-    return format_input(encoded, vocab)
+    return format_input(encoded)
+
+
+def possibly_train_gen(gen, dis, full, data_x, data_y, args):
+    ''' Train the generator if it is supposed to be trained. '''
+
+    if args.train in ['all', 'gen']:
+        print('traing the generator ...')
+        full.fit(data_x, data_y)
+
+        # Share the new weights with the discriminator and generator.
+        share_weights(full, dis)
+        share_weights(dis, full.get_layer('discriminator'))
+        share_weights(full, gen)
+
+    return
+
+
+def possibly_train_dis(gen, dis, full, data_x, data_y, args):
+    ''' Train the discriminator if it is supposed to be trained. '''
+
+    if args.train in ['all', 'dis']:
+        print('training the discriminator ...')
+        dis.fit(data_x, data_y)
+
+        # Share the new weights with the full model and the generator.
+        share_weights(dis, full.get_layer('discriminator'))
+        share_weights(dis, full)
+        share_weights(dis, gen)
+
+    return
+
+
+def possibly_save(gen, dis, full, args):
+    ''' Save the models if the user wants to. '''
+
+    if args.save:
+        print('enter s to save: ', end='')
+        if input() != 's':
+            return
+
+        print('saving the model ...')
+        save(full, args, prefix='full_')
+        save(dis, args, prefix='dis_')
+        save(gen, args, prefix='gen_')
+        print('model saved')
+
+    return
 
 
 def talk(args, vocab, rev_vocab):
@@ -48,18 +95,13 @@ def talk(args, vocab, rev_vocab):
 
         # Share the weights.
         if args.share == 'gen':
-            # Share the meaning and memory layers.
+            # Share the meaning and memory layers with the discriminator.
             share_weights(full, dis)
-
-            # Share the new meaning and memory layers with the untrainable
-            # discriminator in the full model.
-            share_weights(dis, full.get_layer('discriminator'))
+            share_weights(full, full.get_layer('discriminator'))
         else:
             # Share the meaning and memory layers with the untrainable
-            # discriminator in the full model.
+            # discriminator in the full model and the generator.
             share_weights(dis, full.get_layer('discriminator'))
-
-            # Share the meaning and memory layers with the generator.
             share_weights(dis, full)
     else:
         # Get the model.
@@ -83,56 +125,80 @@ def talk(args, vocab, rev_vocab):
         # Print the response.
         print(prompt, ' '.join(encode_with_dict(response, rev_vocab)))
 
-        # Train the model using the user to generate good labels.
+        # Train the model.
         if args.train != 'none':
-            # Get the label response from the user.
-            print('Enter a good response:', end=' ')
-            try:
-                good_gen_out = get_formatted_user_input(vocab)
-            except ValueError:
-                continue
+            # Check if the training data is from the user or a file.
+            if args.train_file is not None:
+                train_x, train_y = [], []
 
-            # Setup the input for training the discriminator.
-            # dis_input = [np.concatenate((bad_gen_out[0], good_gen_out[0])),
-            #              np.concatenate((bad_gen_out[1], good_gen_out[1]))]
+                # Read the data from train_file.
+                with open(os.path.join(args.data_folder, args.train_file), 'r') as infile:
+                    for line in infile:
+                        line = line[:-1]  # Remove the newline.
+                        pos = line.find(':')
+                        train_x.append(line[:pos])
+                        train_y.append(line[pos + 1:])
 
-            # Train the model.
-            if args.train in ['all', 'gen']:
-                print('traing the generator ...')
-                full.fit(gen_input, np.array([0]))
+                # Set each item in train_x and train_y to what is used as input.
+                for (i, (x, y)) in enumerate(zip(train_x, train_y)):
+                    # Encode the data into word id numbers.
+                    x = encode_with_dict(x.split(' '), vocab)
+                    y = encode_with_dict(y.split(' '), vocab)
 
-                # Share the new weights with the discriminator.
-                share_weights(full, dis)
-                share_weights(full, full.get_layer('discriminator'))
+                    # Get the data into the input format for the models.
+                    x = format_input(x)
+                    y = format_input(y)
 
-                # Share the new weights with the generator.
-                share_weights(full, gen)
+                    train_x[i] = x
+                    train_y[i] = y
 
-            # Train the discriminator.
-            if args.train in ['all', 'dis']:
-                print('training the discriminator ...')
-                # dis.fit(dis_input, np.array([0, 1]))
-                dis.fit(good_gen_out, np.array([1]))
-                dis.fit(bad_gen_out,  np.array([0]))
+                # Get the generator predictions.
+                pred = []
 
-                # Share the new weights with the full model.
-                share_weights(dis, full.get_layer('discriminator'))
-                share_weights(dis, full)
+                for x in train_x:
+                    pred.append(gen.predict(x))
 
-                # Share the weights with the generator.
-                share_weights(dis, gen)
+                # Create the input for the discriminator.
+                real_dis_input = []
 
-            # Save the model.
-            if args.save:
-                print('enter s to save: ', end='')
-                if input() != 's':
+                for y in train_y:
+                    real_dis_input.append(y[0])
+
+                real_dis_input = np.concatenate(real_dis_input)
+
+                word_input = np.concatenate((np.concatenate(pred), real_dis_input))
+                mem_input = np.array([np.array([1])] * 2 * len(train_x))
+                dis_input = [word_input, mem_input]
+
+                gen_labels = np.array([np.array([0])] * len(train_x))
+                dis_labels = np.concatenate((np.array([np.array([0])] * len(train_x)),
+                                         np.array([np.array([1])] * len(train_x))))
+
+                gen_input = np.array([x[0] for x in train_x])
+                gen_input = gen_input.reshape(12, 100, 5)
+                gen_input = [gen_input, np.array([[1]] * len(train_x))]
+
+                possibly_train_gen(gen, dis, full, gen_input, gen_labels, args)
+                possibly_train_dis(gen, dis, full, dis_input, dis_labels, args)
+                possibly_save(gen, dis, full, args)
+            else:
+                # Get the label response from the user.
+                print('Enter a good response:', end=' ')
+                try:
+                    good_gen_out = get_formatted_user_input(vocab)
+                except ValueError:
                     continue
 
-                print('saving the model ...')
-                save(full, args, prefix='full_')
-                save(dis, args, prefix='dis_')
-                save(gen, args, prefix='gen_')
-                print('model saved')
+                # Setup the input for training the discriminator.
+                dis_input = [np.concatenate((bad_gen_out[0], good_gen_out[0])),
+                             np.concatenate((bad_gen_out[1], good_gen_out[1]))]
+
+                # Train and save the models.
+                possibly_train_gen(gen, dis, full, gen_input, np.array([0]), args)
+                possibly_train_dis(gen, dis, full, dis_input, np.array([0, 1]), args)
+                possibly_save(gen, dis, full, args)
+
+    return
 
 
 def add_data(filename, vocab):

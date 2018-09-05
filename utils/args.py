@@ -19,5 +19,7 @@ def get_args():
                         help='the folder to store training data files in')
     parser.add_argument('--data_file', type=str, default=None,
                         help='the file to add data to for the model to learn from')
+    parser.add_argument('--train_file', type=str, default=None,
+                        help='the file to use as training data')
 
     return parser.parse_args()
