@@ -30,10 +30,17 @@ def save(model, args, prefix=''):
 
 def share_weights(src_model, dst_model):
     ''' Set weights in one model to the weights in another by layer name. '''
-    tempfile = '.temp_weights.h5'
 
-    src_model.save_weights(tempfile)
-    dst_model.load_weights(tempfile, by_name=True)
-    os.remove(tempfile)
+    for s_layer in src_model.layers:
+        # Ignore input and output layers.
+        if 'input' in s_layer.name or 'output' in s_layer.name:
+            continue
+
+        for d_layer in dst_model.layers:
+            # Share the layer weights if the layers represent the same thing.
+            # Layer names are prefixed with gen_ or dis_, so look after the
+            # first 3 characters.
+            if s_layer.name[3:] == d_layer.name[3:]:
+                d_layer.set_weights(s_layer.get_weights())
 
     return
