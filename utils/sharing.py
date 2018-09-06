@@ -32,11 +32,15 @@ def share_weights(src_model, dst_model):
     ''' Set weights in one model to the weights in another by layer name. '''
 
     for s_layer in src_model.layers:
-        # Ignore input and output layers.
-        if 'input' in s_layer.name or 'output' in s_layer.name:
-            continue
-
         for d_layer in dst_model.layers:
+            # Share exact layers.
+            if s_layer.name == d_layer.name:
+                d_layer.set_weights(s_layer.get_weights())
+
+            # Don't share input and output layers unless they are exact matches.
+            if 'input' in s_layer.name or 'output' in s_layer.name:
+                continue
+
             # Share the layer weights if the layers represent the same thing.
             # Layer names are prefixed with gen_ or dis_, so look after the
             # first 3 characters.
