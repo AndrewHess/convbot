@@ -8,7 +8,7 @@ from utils.losses import generator_loss, discriminator_loss
 from utils.sharing import load, save, share_weights
 
 prompt = '> '
-num_words = 100
+num_words = 10
 vocab_len = 5
 itr = 0
 
@@ -20,10 +20,10 @@ def format_input(encoded):
     # a dummy input with a shape of (1,) that should have the value 1.
 
     # Zero pad the input.
-    encoded += [0] * (100 - len(encoded))
+    encoded += [0] * (num_words - len(encoded))
 
     one_hot = np.zeros((num_words, vocab_len))
-    one_hot[np.arange(100), encoded] = 1
+    one_hot[np.arange(num_words), encoded] = 1
 
     return [np.array([one_hot]), np.array([[1]])]
 
@@ -97,35 +97,37 @@ def talk(args, vocab, rev_vocab):
     # Setup the models.
     gen, dis, full = load(args) if args.load else setup_model()
 
+    # Setup the training data if it is from a file.
+    if args.train_file is not None:
+        # Make sure at least one model is being trained.
+        assert(args.train != 'none')
+
+        train_x, train_y = [], []
+
+        # Read the data from train_file.
+        with open(os.path.join(args.data_folder, args.train_file), 'r') as infile:
+            for line in infile:
+                line = line[:-1]  # Remove the newline.
+                pos = line.find(':')
+                train_x.append(line[:pos])
+                train_y.append(line[pos + 1:])
+
+        # Set each item in train_x and train_y to what is used as input.
+        for (i, (x, y)) in enumerate(zip(train_x, train_y)):
+            # Encode the data into word id numbers.
+            x = encode_with_dict(x.split(' '), vocab)
+            y = encode_with_dict(y.split(' '), vocab)
+
+            # Get the data into the input format for the models.
+            x = format_input(x)
+            y = format_input(y)
+
+            train_x[i] = x
+            train_y[i] = y
+
     # Run the main loop.
     while True:
         if args.train_file is not None:
-            # Make sure at least one model is being trained.
-            assert(args.train != 'none')
-
-            train_x, train_y = [], []
-
-            # Read the data from train_file.
-            with open(os.path.join(args.data_folder, args.train_file), 'r') as infile:
-                for line in infile:
-                    line = line[:-1]  # Remove the newline.
-                    pos = line.find(':')
-                    train_x.append(line[:pos])
-                    train_y.append(line[pos + 1:])
-
-            # Set each item in train_x and train_y to what is used as input.
-            for (i, (x, y)) in enumerate(zip(train_x, train_y)):
-                # Encode the data into word id numbers.
-                x = encode_with_dict(x.split(' '), vocab)
-                y = encode_with_dict(y.split(' '), vocab)
-
-                # Get the data into the input format for the models.
-                x = format_input(x)
-                y = format_input(y)
-
-                train_x[i] = x
-                train_y[i] = y
-
             # Get the generator predictions.
             pred = [gen.predict(x) for x in train_x]
 
@@ -185,6 +187,7 @@ def talk(args, vocab, rev_vocab):
                 possibly_train_dis(gen, dis, full, dis_input, np.array([0, 1]), args)
                 possibly_save(gen, dis, full, args)
 
+    # It will never reach this point.
     return
 
 

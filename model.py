@@ -10,7 +10,7 @@ from keras.optimizers import adam
 from utils.losses import generator_loss, discriminator_loss
 
 
-input_size = 100
+input_size = 10
 vocab_len = 5
 
 
@@ -25,11 +25,6 @@ def setup_model():
 
     # Make it so that only the discriminator can learn sentence meaning.
     full.get_layer('gen_meaning').trainable = False
-
-    # print('full model')
-    # full.summary()
-    # print('discriminator model')
-    # dis.summary()
 
     # Compile the models for training.
     dis.compile(optimizer='adam', loss=discriminator_loss)
