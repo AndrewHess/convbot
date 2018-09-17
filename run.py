@@ -9,7 +9,7 @@ from utils.sharing import load, save, share_weights
 
 prompt = '> '
 num_words = 10
-vocab_len = 5
+vocab_len = 20
 itr = 0
 
 
@@ -45,7 +45,11 @@ def possibly_train_gen(gen, dis, full, data_x, data_y, args):
 
     if args.train in ['all', 'gen']:
         print('traing the generator ...')
-        full.fit(data_x, data_y)
+        hist = full.fit(data_x, data_y)
+
+        # Check if the model to train should be toggled.
+        if hist.history['loss'][0] < args.min_gen_loss:
+            args.train = 'dis'
 
         # Share the new weights with the discriminator and generator.
         share_weights(full, dis)
@@ -60,7 +64,11 @@ def possibly_train_dis(gen, dis, full, data_x, data_y, args):
 
     if args.train in ['all', 'dis']:
         print('training the discriminator ...')
-        dis.fit(data_x, data_y)
+        hist = dis.fit(data_x, data_y)
+
+        # Check if the model to train should be toggled.
+        if hist.history['loss'][0] < args.min_dis_loss:
+            args.train = 'gen'
 
         # Share the new weights with the full model and the generator.
         share_weights(dis, full.get_layer('discriminator'))
