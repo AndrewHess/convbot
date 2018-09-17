@@ -10,7 +10,6 @@ from utils.preprocessing import make_vocab
 def main():
     # Get the command line arguments.
     args = get_args()
-    print('args:', args)
 
     # Build the vocabulary.
     vocab, rev_vocab = make_vocab()

@@ -11,7 +11,7 @@ from utils.losses import generator_loss, discriminator_loss
 
 
 input_size = 10
-vocab_len = 5
+vocab_len = 20
 
 
 def setup_model():
