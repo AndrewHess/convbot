@@ -2,7 +2,7 @@ import os
 import numpy as np
 from keras.models import load_model
 
-from model import setup_model
+from model import setup_model, setup_meaning_autoencoder
 from utils.preprocessing import encode_with_dict, text_in_vocab
 from utils.losses import generator_loss, discriminator_loss
 from utils.sharing import load, save, share_weights
@@ -99,11 +99,60 @@ def possibly_save(gen, dis, full, args):
     return
 
 
+def train_meaning(args):
+    '''
+    Train the sentence autoencoder.
+
+    The autoencoder is used to generate hidden layers that will hopefully
+    produce some form of the meaning of the sentence.
+    '''
+
+    # Setup the model.
+    model = None
+    i = 0
+
+    if args.load_meaning:
+        model = load_model(os.path.join(args.model_folder, args.load_meaning))
+    else:
+        model = build_meaining_autoencoder()
+
+    # Train the model.
+    while True:
+        i += 1
+        print('iteration:', i)
+
+        # Generate random training data.
+        data = np.random.rand(num_words, vocab_len)
+
+        # Make the entries in each row sum to 1.
+        sums = np.sum(data, axis=1)
+        data /= sums[:, None]
+
+        # Make sure that the data represents valid probabilites.
+        assert(np.allclose(np.sum(data, axis=1), np.ones((num_words,))))
+        data = np.array([np.ndarray.flatten(data)])
+
+        # Train the autoencoder on this data.
+        model.fit(data, data)
+
+        # Save the model.
+        if i % args.save_itr == 0:
+            print(f'enter s to save to the file {args.save_meaning}:', end=' ')
+            if input() != 's':
+                continue
+
+            print('saving the model ...')
+            model.save(os.path.join(args.model_folder, args.save_meaning))
+            print('model saved')
+
+    return
+
+
 def talk(args, vocab, rev_vocab):
     ''' Infinitely run the loop of user and bot talking with user feedback. '''
 
     # Setup the models.
-    gen, dis, full = load(args) if args.load else setup_model()
+    gen, dis, full = load(args) if args.load else setup_model(args)
 
     # Setup the training data if it is from a file.
     if args.train_file is not None:
