@@ -3,7 +3,7 @@ from tensorflow.keras.backend import one_hot
 from tensorflow import shape
 
 import keras.backend as K
-from keras.models import Model
+from keras.models import Model, clone_model
 from keras.layers import Input, Dense, Concatenate, Lambda, Reshape, Flatten
 from keras.optimizers import adam
 
@@ -20,13 +20,25 @@ def setup_model():
     # Build the models.
     gen, dis, full = build_model()
 
+    # The full model is to train the generator, so freeze the discriminator.
+    # Due to a bug in preserving the trainable state of a sub model after
+    # saving and loading a model, each layer has to be set to untrainable
+    # instead of just setting the discriminator sub model to be untrainable.
+    for layer in full.get_layer('discriminator').layers:
+        layer.trainable = False
+
+    full.get_layer('discriminator').set_weights(dis.get_weights())
+
     # Compile the models for training.
     dis.compile(optimizer='adam', loss=discriminator_loss)
-
-    # The full model is to train the generator, so freeze the discriminator.
-    full.get_layer('discriminator').trainable = False
-
     full.compile(optimizer='adam', loss=generator_loss)
+
+    # Show the model architectures.
+    print('discriminator')
+    dis.summary()
+
+    print('stacked')
+    full.summary()
 
     return gen, dis, full
 
@@ -67,19 +79,9 @@ def build_model():
     gen = Model(inputs=[gen_input, mem_input], outputs=gen_output, name='generator')
     dis = Model(inputs=[gen_input, dis_input, mem_input], outputs=dis_output, name='discriminator')
 
-    full_output = dis([gen_input, gen_output, mem_input])
+    # Build the full model. Use a copy of the discriminator so that it can be
+    # trainable on its own but untrainable in the full model.
+    full_output = clone_model(dis)([gen_input, gen_output, mem_input])
     full = Model(inputs=[gen_input, mem_input], outputs=full_output, name='full_model')
 
     return gen, dis, full
-
-
-def build_meaning(is_gen):
-    ''' Build a network that determines the meaning of a sentence. '''
-
-    model_name = 'gen_meaning' if is_gen else 'dis_meaning'
-
-    input_layer = Input(shape=(input_size, vocab_len), name='meaning_input')
-    hidden = Flatten(name='meaning_flatten')(input_layer)
-    output_layer = Dense(10, activation='relu')(hidden)
-
-    return Model(inputs=input_layer, outputs=output_layer, name=model_name)

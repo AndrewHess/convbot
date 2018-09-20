@@ -52,14 +52,16 @@ def possibly_train_gen(gen, dis, full, data_x, data_y, args):
         if hist.history['loss'][0] < args.min_gen_loss:
             args.train = 'dis'
 
-        # Share the new weights with the discriminator and generator.
-        # share_weights(full, dis)
-        # share_weights(dis, full.get_layer('discriminator'))
+        # Share the new weights with the generator.
         share_weights(full, gen)
 
-        # print('difference in weights:')
-        # for w1, w2 in zip(dis.get_weights(), full.get_layer('discriminator').get_weights()):
-        #     print(w1 - w2)
+        # The full model should have the weights of the generator and the
+        # discriminator models.
+        for w1, w2 in zip(dis.get_weights(), full.get_layer('discriminator').get_weights()):
+            assert(not np.any(w1 - w2))
+
+        for w1, w2 in zip(gen.get_weights(), full.get_weights()):
+            assert(not np.any(w1 - w2))
 
     return
 
@@ -78,12 +80,9 @@ def possibly_train_dis(gen, dis, full, data_x, data_y, args):
         # Share the new weights with the full model and the generator.
         share_weights(dis, full.get_layer('discriminator'))
 
-        # print('difference in weights:')
-        # for w1, w2 in zip(dis.get_weights(), full.get_layer('discriminator').get_weights()):
-        #     print(w1 - w2)
-
-        # share_weights(dis, full)
-        # share_weights(dis, gen)
+        # The full model should have the updated discriminator weights.
+        for w1, w2 in zip(dis.get_weights(), full.get_layer('discriminator').get_weights()):
+            assert(not np.any(w1 - w2))
 
     return
 
@@ -158,8 +157,6 @@ def talk(args, vocab, rev_vocab):
 
             # Create the input for the generator.
             gen_input = np.concatenate([x[0] for x in train_x])
-            # gen_input = [gen_input, np.array([[1]] * len(train_x))]
-            # gen_input = [gen_input, np.array([[np.random.random_sample()]] * len(train_x))]
             gen_input = [gen_input, np.random.random_sample(size=(len(train_x), 1))]
 
             # Create the labels.
