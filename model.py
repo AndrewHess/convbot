@@ -20,14 +20,12 @@ def setup_model():
     # Build the models.
     gen, dis, full = build_model()
 
+    # Compile the models for training.
+    dis.compile(optimizer='adam', loss=discriminator_loss)
+
     # The full model is to train the generator, so freeze the discriminator.
     full.get_layer('discriminator').trainable = False
 
-    # Make it so that only the discriminator can learn sentence meaning.
-    full.get_layer('gen_meaning').trainable = False
-
-    # Compile the models for training.
-    dis.compile(optimizer='adam', loss=discriminator_loss)
     full.compile(optimizer='adam', loss=generator_loss)
 
     return gen, dis, full
@@ -43,7 +41,9 @@ def build_model():
 
     # Build the generator.
     gen_input = Input(shape=(input_size, vocab_len), name='gen_input')
-    gen_meaning = build_meaning(True)(gen_input)
+    encoded = Dense(10, name='gen_encoded')(gen_input)
+    flatten = Flatten()(encoded)
+    gen_meaning = Dense(10, name='gen_meaning')(flatten)
     gen_mem_concat = Concatenate(name='gen_mem_concat')([gen_meaning, gen_memory])
 
     # Create probabilites for each word for each output location.
@@ -53,10 +53,13 @@ def build_model():
     gen_output = Reshape((input_size, vocab_len), name='gen_output')(gen_word_concat)
 
     # Build the discriminator.
-    dis_meaning_model = build_meaning(False)
     dis_input = Input(shape=(input_size, vocab_len), name='dis_input')
-    dis_meaning = dis_meaning_model(dis_input)
-    dis_gen_meaning = dis_meaning_model(gen_input)
+    encoded_dis = Dense(10, name='dis_encoded')(dis_input)
+    encoded_gen = Dense(10, name='dis_gen_encoded')(gen_input)
+    flatten_dis = Flatten()(encoded_dis)
+    flatten_gen = Flatten()(encoded_gen)
+    dis_meaning = Dense(10, name='dis_meaning')(flatten_dis)
+    dis_gen_meaning = Dense(10, name='dis_gen_meaning')(flatten_gen)
     dis_concat = Concatenate(name='dis_concat')([dis_gen_meaning, dis_meaning, dis_memory])
     dis_output = Dense(1, activation='sigmoid', name='dis_output')(dis_concat)
 

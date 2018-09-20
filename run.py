@@ -25,7 +25,8 @@ def format_input(encoded):
     one_hot = np.zeros((num_words, vocab_len))
     one_hot[np.arange(num_words), encoded] = 1
 
-    return [np.array([one_hot]), np.array([[1]])]
+    # return [np.array([one_hot]), np.array([[1]])]
+    return [np.array([one_hot]), np.array([[np.random.random_sample()]])]
 
 
 def get_formatted_user_input(vocab):
@@ -52,9 +53,13 @@ def possibly_train_gen(gen, dis, full, data_x, data_y, args):
             args.train = 'dis'
 
         # Share the new weights with the discriminator and generator.
-        share_weights(full, dis)
-        share_weights(dis, full.get_layer('discriminator'))
+        # share_weights(full, dis)
+        # share_weights(dis, full.get_layer('discriminator'))
         share_weights(full, gen)
+
+        # print('difference in weights:')
+        # for w1, w2 in zip(dis.get_weights(), full.get_layer('discriminator').get_weights()):
+        #     print(w1 - w2)
 
     return
 
@@ -72,8 +77,13 @@ def possibly_train_dis(gen, dis, full, data_x, data_y, args):
 
         # Share the new weights with the full model and the generator.
         share_weights(dis, full.get_layer('discriminator'))
-        share_weights(dis, full)
-        share_weights(dis, gen)
+
+        # print('difference in weights:')
+        # for w1, w2 in zip(dis.get_weights(), full.get_layer('discriminator').get_weights()):
+        #     print(w1 - w2)
+
+        # share_weights(dis, full)
+        # share_weights(dis, gen)
 
     return
 
@@ -148,7 +158,9 @@ def talk(args, vocab, rev_vocab):
 
             # Create the input for the generator.
             gen_input = np.concatenate([x[0] for x in train_x])
-            gen_input = [gen_input, np.array([[1]] * len(train_x))]
+            # gen_input = [gen_input, np.array([[1]] * len(train_x))]
+            # gen_input = [gen_input, np.array([[np.random.random_sample()]] * len(train_x))]
+            gen_input = [gen_input, np.random.random_sample(size=(len(train_x), 1))]
 
             # Create the labels.
             gen_labels = np.array([np.array([0])] * len(train_x))
