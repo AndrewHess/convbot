@@ -161,10 +161,17 @@ def talk(args, vocab, rev_vocab):
             gen_input = np.concatenate([x[0] for x in train_x])
             gen_input = [gen_input, np.random.random_sample(size=(len(train_x), 10))]
 
-            # Create the labels.
-            gen_labels = np.array([np.array([0])] * len(train_x))
-            dis_labels = np.concatenate((np.array([np.array([0])] * len(train_x)),
-                                         np.array([np.array([1])] * len(train_x))))
+            # Create the noisy labels.
+            gen_labels = 1 - np.random.random_sample(size=(len(train_x), 1)) / 10
+            dis_labels = np.concatenate((1 - np.random.random_sample(size=(len(train_x), 1)) / 10,
+                                         np.random.random_sample(size=(len(train_x), 1)) / 10))
+
+            # Randomly flip 5 percent of the discriminator's labels to keep the
+            # discriminator loss from decreasing to 0 too quickly.
+            for _ in range(int(len(train_x) * 0.05)):
+                i = np.random.randint(0, len(train_x))
+                k = len(train_x) - i - 1
+                dis_labels[i][0], dis_labels[k][0] = dis_labels[k][0], dis_labels[i][0]
 
             # Train and save the models.
             possibly_train_gen(gen, dis, full, gen_input, gen_labels, args)
@@ -200,9 +207,15 @@ def talk(args, vocab, rev_vocab):
                 dis_input = [np.concatenate((gen_input[0], gen_input[0])),
                              np.concatenate((bad_gen_out[0], good_gen_out[0]))]
 
+                # Use noisy labels to help with training.
+                gen_labels = np.random.random_sample(size=(1, 1)) / 10
+                dis_labels = np.random.random_sample(size=(2, 1)) / 10
+                gen_labels[0][0] = 1 - gen_labels[0][0]
+                dis_labels[0][0] = 1 - dis_labels[0][0]
+
                 # Train and save the models.
-                possibly_train_gen(gen, dis, full, gen_input, np.array([0]), args)
-                possibly_train_dis(gen, dis, full, dis_input, np.array([0, 1]), args)
+                possibly_train_gen(gen, dis, full, gen_input, gen_labels, args)
+                possibly_train_dis(gen, dis, full, dis_input, dis_labels, args)
                 possibly_save(gen, dis, full, args)
 
     # It will never reach this point.
