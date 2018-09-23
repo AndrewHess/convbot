@@ -17,7 +17,7 @@ def format_input(encoded):
     ''' Generate input for the model based on a list of numbers and the vocab. '''
 
     # The model input has a shape of (batch_size, num_words, vocab_len) and
-    # a dummy input with a shape of (1,) that should have the value 1.
+    # an input of shape (batch_size, 10).
 
     # Zero pad the input.
     encoded += [0] * (num_words - len(encoded))
@@ -25,8 +25,7 @@ def format_input(encoded):
     one_hot = np.zeros((num_words, vocab_len))
     one_hot[np.arange(num_words), encoded] = 1
 
-    # return [np.array([one_hot]), np.array([[1]])]
-    return [np.array([one_hot]), np.array([[np.random.random_sample()]])]
+    return [np.array([one_hot]), np.array([np.random.random_sample(size=(10,))])]
 
 
 def get_formatted_user_input(vocab):
@@ -145,6 +144,9 @@ def talk(args, vocab, rev_vocab):
     # Run the main loop.
     while True:
         if args.train_file is not None:
+            # Use new random numbers for the input.
+            train_x = [[x[0], np.random.random_sample(size=(1, 10))] for x in train_x]
+
             # Get the generator predictions.
             pred = [gen.predict(x) for x in train_x]
 
@@ -153,11 +155,11 @@ def talk(args, vocab, rev_vocab):
             prompt_input = np.concatenate([x[0] for x in train_x] * 2)
             word_input = np.concatenate((np.concatenate(pred), real_dis_input))
             mem_input = np.array([np.array([1])] * 2 * len(train_x))
-            dis_input = [prompt_input, word_input, mem_input]
+            dis_input = [prompt_input, word_input]
 
             # Create the input for the generator.
             gen_input = np.concatenate([x[0] for x in train_x])
-            gen_input = [gen_input, np.random.random_sample(size=(len(train_x), 1))]
+            gen_input = [gen_input, np.random.random_sample(size=(len(train_x), 10))]
 
             # Create the labels.
             gen_labels = np.array([np.array([0])] * len(train_x))
@@ -196,8 +198,7 @@ def talk(args, vocab, rev_vocab):
 
                 # Setup the input for training the discriminator.
                 dis_input = [np.concatenate((gen_input[0], gen_input[0])),
-                             np.concatenate((bad_gen_out[0], good_gen_out[0])),
-                             np.concatenate((bad_gen_out[1], good_gen_out[1]))]
+                             np.concatenate((bad_gen_out[0], good_gen_out[0]))]
 
                 # Train and save the models.
                 possibly_train_gen(gen, dis, full, gen_input, np.array([0]), args)

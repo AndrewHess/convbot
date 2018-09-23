@@ -47,16 +47,14 @@ def build_model():
     ''' Build the generator, discriminator, and combined models. '''
 
     # Setup the memory.
-    mem_input = Input(shape=(1,), name='mem_input')
-    gen_memory = Dense(2, name='gen_memory')(mem_input)
-    dis_memory = Dense(2, name='dis_memory')(mem_input)
+    random_input = Input(shape=(10,), name='rand_input')
 
     # Build the generator.
     gen_input = Input(shape=(input_size, vocab_len), name='gen_input')
     encoded = Dense(10, name='gen_encoded')(gen_input)
     flatten = Flatten()(encoded)
     gen_meaning = Dense(10, name='gen_meaning')(flatten)
-    gen_mem_concat = Concatenate(name='gen_mem_concat')([gen_meaning, gen_memory])
+    gen_mem_concat = Concatenate(name='gen_mem_concat')([gen_meaning, random_input])
 
     # Create probabilites for each word for each output location.
     hidden = [Dense(vocab_len, activation='softmax', name='gen_word_' + str(i))(gen_mem_concat)
@@ -72,16 +70,16 @@ def build_model():
     flatten_gen = Flatten()(encoded_gen)
     dis_meaning = Dense(10, name='dis_meaning')(flatten_dis)
     dis_gen_meaning = Dense(10, name='dis_gen_meaning')(flatten_gen)
-    dis_concat = Concatenate(name='dis_concat')([dis_gen_meaning, dis_meaning, dis_memory])
+    dis_concat = Concatenate(name='dis_concat')([dis_gen_meaning, dis_meaning])
     dis_output = Dense(1, activation='sigmoid', name='dis_output')(dis_concat)
 
     # Setup the models.
-    gen = Model(inputs=[gen_input, mem_input], outputs=gen_output, name='generator')
-    dis = Model(inputs=[gen_input, dis_input, mem_input], outputs=dis_output, name='discriminator')
+    gen = Model(inputs=[gen_input, random_input], outputs=gen_output, name='generator')
+    dis = Model(inputs=[gen_input, dis_input], outputs=dis_output, name='discriminator')
 
     # Build the full model. Use a copy of the discriminator so that it can be
     # trainable on its own but untrainable in the full model.
-    full_output = clone_model(dis)([gen_input, gen_output, mem_input])
-    full = Model(inputs=[gen_input, mem_input], outputs=full_output, name='full_model')
+    full_output = clone_model(dis)([gen_input, gen_output])
+    full = Model(inputs=[gen_input, random_input], outputs=full_output, name='full_model')
 
     return gen, dis, full
