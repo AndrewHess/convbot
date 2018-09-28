@@ -111,7 +111,7 @@ def talk(args, vocab, rev_vocab):
     ''' Infinitely run the loop of user and bot talking with user feedback. '''
 
     # Setup the models.
-    gen, dis, full = load(args) if args.load else setup_model()
+    gen, dis, full = load(args) if args.load else setup_model(args)
 
     # Setup the training data if it is from a file.
     if args.train_file is not None:

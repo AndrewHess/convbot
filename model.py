@@ -14,7 +14,7 @@ input_size = 10
 vocab_len = 20
 
 
-def setup_model():
+def setup_model(args):
     ''' Build and compile the models. '''
 
     # Build the models.
@@ -30,8 +30,8 @@ def setup_model():
     full.get_layer('discriminator').set_weights(dis.get_weights())
 
     # Compile the models for training.
-    dis.compile(optimizer='adam', loss=discriminator_loss)
-    full.compile(optimizer='adam', loss=generator_loss)
+    dis.compile(optimizer=adam(lr=args.dis_lr), loss=discriminator_loss)
+    full.compile(optimizer=adam(lr=args.gen_lr), loss=generator_loss)
 
     # Show the model architectures.
     print('discriminator')
