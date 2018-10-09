@@ -5,7 +5,8 @@ from tensorflow import shape
 import keras.backend as K
 from keras.models import Model, clone_model
 from keras.layers import Input, Dense, Concatenate, Lambda, Reshape, Flatten
-from keras.optimizers import adam
+from keras.layers.advanced_activations import LeakyReLU
+from keras.optimizers import adam, sgd
 
 from utils.losses import generator_loss, discriminator_loss
 
@@ -31,7 +32,7 @@ def setup_model(args):
 
     # Compile the models for training.
     dis.compile(optimizer=adam(lr=args.dis_lr), loss=discriminator_loss)
-    full.compile(optimizer=adam(lr=args.gen_lr), loss=generator_loss)
+    full.compile(optimizer=sgd(lr=args.gen_lr), loss=generator_loss)
 
     # Show the model architectures.
     print('discriminator')
@@ -51,9 +52,11 @@ def build_model():
 
     # Build the generator.
     gen_input = Input(shape=(input_size, vocab_len), name='gen_input')
-    encoded = Dense(10, activation='relu', name='gen_encoded')(gen_input)
+    encoded = Dense(10, name='gen_encoded')(gen_input)
+    encoded = LeakyReLU()(encoded)
     flatten = Flatten()(encoded)
-    gen_meaning = Dense(10, activation='relu', name='gen_meaning')(flatten)
+    gen_meaning = Dense(10, name='gen_meaning')(flatten)
+    gen_meaning = LeakyReLU()(gen_meaning)
     gen_mem_concat = Concatenate(name='gen_mem_concat')([gen_meaning, random_input])
 
     # Create probabilites for each word for each output location.
@@ -64,12 +67,19 @@ def build_model():
 
     # Build the discriminator.
     dis_input = Input(shape=(input_size, vocab_len), name='dis_input')
-    encoded_dis = Dense(10, activation='relu', name='dis_encoded')(dis_input)
-    encoded_gen = Dense(10, activation='relu', name='dis_gen_encoded')(gen_input)
+
+    encoded_dis = Dense(10, name='dis_encoded')(dis_input)
+    encoded_dis = LeakyReLU()(encoded_dis)
+    encoded_gen = Dense(10, name='dis_gen_encoded')(gen_input)
+    encoded_gen = LeakyReLU()(encoded_gen)
+
     flatten_dis = Flatten()(encoded_dis)
     flatten_gen = Flatten()(encoded_gen)
-    dis_meaning = Dense(10, activation='relu', name='dis_meaning')(flatten_dis)
-    dis_gen_meaning = Dense(10, activation='relu', name='dis_gen_meaning')(flatten_gen)
+
+    dis_meaning = Dense(10, name='dis_meaning')(flatten_dis)
+    dis_meaning = LeakyReLU()(dis_meaning)
+    dis_gen_meaning = Dense(10, name='dis_gen_meaning')(flatten_gen)
+    dis_gen_meaning = LeakyReLU()(dis_gen_meaning)
     dis_concat = Concatenate(name='dis_concat')([dis_gen_meaning, dis_meaning])
     dis_output = Dense(1, activation='sigmoid', name='dis_output')(dis_concat)
 
