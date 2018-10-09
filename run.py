@@ -9,6 +9,7 @@ from utils.sharing import load, save, share_weights
 
 prompt = '> '
 num_words = 10
+num_rand = 100
 vocab_len = 20
 itr = 0
 
@@ -25,7 +26,7 @@ def format_input(encoded):
     one_hot = np.zeros((num_words, vocab_len))
     one_hot[np.arange(num_words), encoded] = 1
 
-    return [np.array([one_hot]), np.array([np.random.random_sample(size=(10,))])]
+    return [np.array([one_hot]), np.array([np.random.random_sample(size=(num_rand,))])]
 
 
 def get_formatted_user_input(vocab):
@@ -50,6 +51,8 @@ def possibly_train_gen(gen, dis, full, data_x, data_y, args):
         # Check if the model to train should be toggled.
         if hist.history['loss'][0] < args.min_gen_loss:
             args.train = 'dis'
+        elif hist.history['loss'][0] < args.max_gen_loss:
+            args.train = 'all'
 
         # Share the new weights with the generator.
         share_weights(full, gen)
@@ -75,6 +78,8 @@ def possibly_train_dis(gen, dis, full, data_x, data_y, args):
         # Check if the model to train should be toggled.
         if hist.history['loss'][0] < args.min_dis_loss:
             args.train = 'gen'
+        elif hist.history['loss'][0] < args.max_dis_loss:
+            args.train = 'all'
 
         # Share the new weights with the full model and the generator.
         share_weights(dis, full.get_layer('discriminator'))
@@ -145,7 +150,7 @@ def talk(args, vocab, rev_vocab):
     while True:
         if args.train_file is not None:
             # Use new random numbers for the input.
-            train_x = [[x[0], np.random.random_sample(size=(1, 10))] for x in train_x]
+            train_x = [[x[0], np.random.random_sample(size=(1, num_rand))] for x in train_x]
 
             # Get the generator predictions.
             pred = [gen.predict(x) for x in train_x]
@@ -159,7 +164,7 @@ def talk(args, vocab, rev_vocab):
 
             # Create the input for the generator.
             gen_input = np.concatenate([x[0] for x in train_x])
-            gen_input = [gen_input, np.random.random_sample(size=(len(train_x), 10))]
+            gen_input = [gen_input, np.random.random_sample(size=(len(train_x), num_rand))]
 
             # Create the noisy labels.
             gen_labels = 1 - np.random.random_sample(size=(len(train_x), 1)) / 10

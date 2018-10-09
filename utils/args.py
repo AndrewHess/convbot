@@ -9,10 +9,14 @@ def get_args():
     # Setup general training flags.
     parser.add_argument('--train', help='the parts of the model to train',
                         choices=['gen', 'dis', 'all', 'none'], default='none')
-    parser.add_argument('--min_gen_loss', type=float, default=0.5,
+    parser.add_argument('--min_gen_loss', type=float, default=0.4,
                         help='the generator threshold loss to switch to training the discriminator')
-    parser.add_argument('--min_dis_loss', type=float, default=0.5,
+    parser.add_argument('--min_dis_loss', type=float, default=0.4,
                         help='the discriminator threshold loss to switch to training the generator')
+    parser.add_argument('--max_gen_loss', type=float, default=0.6,
+                        help='the generator threshold loss to switch to training both models')
+    parser.add_argument('--max_dis_loss', type=float, default=0.6,
+                        help='the generator threshold loss to switch to training both models')
 
     # Setup flags related to saving and loading.
     parser.add_argument('--model_folder', type=str, default='./saved',
