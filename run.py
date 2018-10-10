@@ -69,19 +69,52 @@ def possibly_train_gen(gen, dis, full, data_x, data_y, args):
 
 
 def possibly_train_dis(gen, dis, full, data_x, data_y, args):
-    ''' Train the discriminator if it is supposed to be trained. '''
+    ''' Train the discriminator if it is supposed to be trained.
+
+        The discriminator is trained on batches of only real output and only
+        generated output as suggested on https://github.com/soumith/ganhacks.
+    '''
 
     if args.train in ['all', 'dis']:
+        # Get the real batch and the generated batch using the noisy data_y.
+        real_data_x, fake_data_x = [[], []], [[], []]
+        real_data_y, fake_data_y = [], []
+
+        for i, item in enumerate(data_y):
+            # Check if the data is real or generated.
+            if item[0] - 0.5 > 0:
+                fake_data_y.append(item)
+                # fake_data_x.append([data_x[0][i], data_x[1][i]])
+                fake_data_x[0].append(data_x[0][i])
+                fake_data_x[1].append(data_x[1][i])
+            else:
+                real_data_y.append(item)
+                real_data_x[0].append(data_x[0][i])
+                real_data_x[1].append(data_x[1][i])
+                # real_data_x.append([data_x[0][i], data_x[1][i]])
+
+        # Convert to numpy arrays.
+        fake_data_y = np.array(fake_data_y)
+        real_data_y = np.array(real_data_y)
+        fake_data_x[0] = np.array(fake_data_x[0])
+        fake_data_x[1] = np.array(fake_data_x[1])
+        real_data_x[0] = np.array(real_data_x[0])
+        real_data_x[1] = np.array(real_data_x[1])
+
         print('training the discriminator ...')
-        hist = dis.fit(data_x, data_y)
+        hist_real_data = dis.fit(real_data_x, real_data_y)
+        hist_fake_data = dis.fit(fake_data_x, fake_data_y)
+
+        # Get the average loss.
+        loss = (hist_real_data.history['loss'][0] + hist_fake_data.history['loss'][0]) / 2
 
         # Check if the model to train should be toggled.
-        if hist.history['loss'][0] < args.min_dis_loss:
+        if loss < args.min_dis_loss:
             args.train = 'gen'
-        elif hist.history['loss'][0] < args.max_dis_loss:
+        elif loss < args.max_dis_loss:
             args.train = 'all'
 
-        # Share the new weights with the full model and the generator.
+        # Share the new weights with the full model.
         share_weights(dis, full.get_layer('discriminator'))
 
         # The full model should have the updated discriminator weights.
@@ -159,7 +192,6 @@ def talk(args, vocab, rev_vocab):
             real_dis_input = np.concatenate([y[0] for y in train_y])
             prompt_input = np.concatenate([x[0] for x in train_x] * 2)
             word_input = np.concatenate((np.concatenate(pred), real_dis_input))
-            mem_input = np.array([np.array([1])] * 2 * len(train_x))
             dis_input = [prompt_input, word_input]
 
             # Create the input for the generator.
