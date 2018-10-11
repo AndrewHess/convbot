@@ -127,14 +127,11 @@ def possibly_train_dis(gen, dis, full, data_x, data_y, args):
 def possibly_save(gen, dis, full, args):
     ''' Save the models if the user wants to. '''
 
-    global itr
-    itr += 1
-    print('iteration:', itr)
-
     if args.save and itr % args.save_itr == 0:
-        print('enter s to save: ', end='')
-        if input() != 's':
-            return
+        if not args.autosave:
+            print('enter s to save: ', end='')
+            if input() != 's':
+                return
 
         print('saving the model ...')
         save(full, args, prefix='full_')
@@ -147,6 +144,8 @@ def possibly_save(gen, dis, full, args):
 
 def talk(args, vocab, rev_vocab):
     ''' Infinitely run the loop of user and bot talking with user feedback. '''
+
+    global itr
 
     # Setup the models.
     gen, dis, full = load(args) if args.load else setup_model(args)
@@ -180,7 +179,10 @@ def talk(args, vocab, rev_vocab):
             train_y[i] = y
 
     # Run the main loop.
-    while True:
+    while itr < args.epochs:
+        itr += 1
+        print('iteration:', itr)
+
         if args.train_file is not None:
             # Use new random numbers for the input.
             train_x = [[x[0], np.random.normal(size=(1, num_rand))] for x in train_x]
