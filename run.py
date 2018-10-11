@@ -26,7 +26,7 @@ def format_input(encoded):
     one_hot = np.zeros((num_words, vocab_len))
     one_hot[np.arange(num_words), encoded] = 1
 
-    return [np.array([one_hot]), np.array([np.random.random_sample(size=(num_rand,))])]
+    return [np.array([one_hot]), np.array([np.random.normal(size=(num_rand,))])]
 
 
 def get_formatted_user_input(vocab):
@@ -183,7 +183,7 @@ def talk(args, vocab, rev_vocab):
     while True:
         if args.train_file is not None:
             # Use new random numbers for the input.
-            train_x = [[x[0], np.random.random_sample(size=(1, num_rand))] for x in train_x]
+            train_x = [[x[0], np.random.normal(size=(1, num_rand))] for x in train_x]
 
             # Get the generator predictions.
             pred = [gen.predict(x) for x in train_x]
@@ -196,7 +196,7 @@ def talk(args, vocab, rev_vocab):
 
             # Create the input for the generator.
             gen_input = np.concatenate([x[0] for x in train_x])
-            gen_input = [gen_input, np.random.random_sample(size=(len(train_x), num_rand))]
+            gen_input = [gen_input, np.random.normal(size=(len(train_x), num_rand))]
 
             # Create the noisy labels.
             gen_labels = 1 - np.random.random_sample(size=(len(train_x), 1)) / 10
