@@ -6,10 +6,11 @@ from model import setup_model
 from utils.preprocessing import encode_with_dict, text_in_vocab
 from utils.losses import generator_loss, discriminator_loss
 from utils.sharing import load, save, share_weights
+from utils.args import get_args
 
 prompt = '> '
 num_words = 10
-num_rand = 100
+num_rand = get_args().nrand
 vocab_len = 20
 itr = 0
 
@@ -181,7 +182,9 @@ def talk(args, vocab, rev_vocab):
     # Run the main loop.
     while itr < args.epochs:
         itr += 1
-        print('iteration:', itr)
+
+        if args.train is not 'none':
+            print('iteration:', itr)
 
         if args.train_file is not None:
             # Use new random numbers for the input.

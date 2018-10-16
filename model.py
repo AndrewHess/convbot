@@ -4,7 +4,7 @@ from tensorflow import shape
 
 import keras.backend as K
 from keras.models import Model, clone_model
-from keras.layers import Input, Dense, Concatenate, Lambda, Reshape, Flatten
+from keras.layers import Input, Dense, Concatenate, Lambda, Reshape, Flatten, Dropout
 from keras.layers.advanced_activations import LeakyReLU
 from keras.optimizers import adam, sgd
 
@@ -19,7 +19,7 @@ def setup_model(args):
     ''' Build and compile the models. '''
 
     # Build the models.
-    gen, dis, full = build_model()
+    gen, dis, full = build_model(args)
 
     # The full model is to train the generator, so freeze the discriminator.
     # Due to a bug in preserving the trainable state of a sub model after
@@ -44,18 +44,20 @@ def setup_model(args):
     return gen, dis, full
 
 
-def build_model():
+def build_model(args):
     ''' Build the generator, discriminator, and combined models. '''
 
     # Setup the memory.
-    random_input = Input(shape=(100,), name='rand_input')
+    random_input = Input(shape=(args.nrand,), name='rand_input')
 
     # Build the generator.
     gen_input = Input(shape=(input_size, vocab_len), name='gen_input')
     encoded = Dense(10, name='gen_encoded')(gen_input)
     encoded = LeakyReLU()(encoded)
     flatten = Flatten()(encoded)
-    gen_meaning = Dense(10, name='gen_meaning')(flatten)
+    gen_meaning = Dense(20)(flatten)
+    gen_meaning = Dropout(0.5)(gen_meaning)
+    gen_meaning = Dense(10, name='gen_meaning')(gen_meaning)
     gen_meaning = LeakyReLU()(gen_meaning)
     gen_mem_concat = Concatenate(name='gen_mem_concat')([gen_meaning, random_input])
 

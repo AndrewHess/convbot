@@ -39,6 +39,8 @@ def get_args():
                         help='the file to use as training data')
 
     # Setup the hyperparameters.
+    parser.add_argument('--nrand', type=int, default=10,
+                        help='the lenght of the random input into the generator')
     parser.add_argument('--dis_lr', type=float, default=0.00001,
                         help='the discriminator learning rate')
     parser.add_argument('--gen_lr', type=float, default=0.001,
